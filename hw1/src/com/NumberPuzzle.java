@@ -18,7 +18,6 @@ public class NumberPuzzle {
     private int blank_r, blank_c;   // blank row and column
 
     private int[][] solution;
-    private Node[][] node_tiles;
 
     public static void main(String[] args) {
         NumberPuzzle myPuzzle = readPuzzle();
@@ -88,30 +87,26 @@ public class NumberPuzzle {
 
 /*------------------ Implementation ------------------*/
 
-    class Edge {
-        private int cost = 0;
-        private Node target;
+    class Node {
+        NumberPuzzle state;
+        int f = 0, g;
+        Node parent;
 
-        Edge (Node targetNode) {
-            target = targetNode;
+        Node(NumberPuzzle state, Node parent, int cost) {
+            this.g = (parent != null) ? parent.g+cost : cost;
+            this.state = state;
+            this.parent = parent;
+            this.f = g + cost;
         }
     }
 
-    class Node {
-        private int value;
-        private int x;
-        private int y;
-        private int h;
-        private int f = 0;
-        private int g;
-        private Edge[] neighbors;
-        private Node parent;
+    public Set<Node> getNeighbors(Node n) {
+        int b_row = n.state.blank_r;
+        int b_col = n.state.blank_c;
+        Set<Node> neighbors = new HashSet<Node>();
+        // Top
 
-        Node(int val, int row, int col) {
-            value = val;
-            x = row;
-            y = col;
-        }
+        return neighbors;
     }
 
     public int[] getGoalCoord(int num) {
@@ -133,30 +128,8 @@ public class NumberPuzzle {
         return coords;
     }
 
-    public void initNodes() {
-        for (int i = 0; i < PUZZLE_WIDTH; i++) {
-            for (int j = 0; j < PUZZLE_WIDTH; j++) {
-                node_tiles[i][j] = new Node(tiles[i][j], i, j);
-            }
-        }
-    }
 
-    public void initNeighbors() {
-        for (int i = 0; i < PUZZLE_WIDTH; i++) {
-            for (int j = 0; j < PUZZLE_WIDTH; j++) {
-                node_tiles[i][j].neighbors = new Edge[]{
-                        new Edge(node_tiles[i+1][j]),   // Top
-                        new Edge(node_tiles[i-1][j]),   // Bottom
-                        new Edge(node_tiles[i][j+1]),   // right
-                        new Edge(node_tiles[i][j-1]),   // Left
-                        new Edge(node_tiles[i+1][j+1]), // Diagonals
-                        new Edge(node_tiles[i+1][j-1]),
-                        new Edge(node_tiles[i-1][j+1]),
-                        new Edge(node_tiles[i-1][j-1])
-                }
-            }
-        }
-    }
+
 //    public int getManhattanDistance(Node n) {
 //        int[] goalPos = getGoalCoord(n.value);
 //        int goalRow = goalPos[0], goalCol = goalPos[1];
@@ -188,21 +161,21 @@ public class NumberPuzzle {
         });
     }
 
-//    private PriorityQueue<Node> initManhattanQueue() {
-//        return new PriorityQueue<>(32, new Comparator<Node>() {
-//            public int compare(Node o1, Node o2) {
-//                int d1 = getManhattanDistance(o1);
-//                int d2 = getManhattanDistance(o2);
-//                if (d1 < d2)
-//                {
-//                    return 1;
-//                }
-//                return 0;
-//            }
-//        });
-//    }
-
-
+    public boolean isSolved(Node n) {
+        NumberPuzzle np = n.state;
+        int shouldBe = 1;
+        for (int row = 0; row < PUZZLE_WIDTH; row++) {
+            for (int col = 0; col < PUZZLE_WIDTH; col++) {
+                if (np.tiles[row][col] != shouldBe) {
+                    return false;
+                } else {
+                    // Take advantage of BLANK == 0
+                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
+                }
+            }
+        }
+        return true;
+    }
 
     // Heuristic that returns the number of tiles out of place.
     public int placeHeuristic() {
@@ -225,32 +198,35 @@ public class NumberPuzzle {
         // Setup
         Node current;
         int[] goalCoordinates;
-        initNodes();
-        initNeighbors();
 
         // Init Queue and explored nodes
-        Set<Node> exploredNodes = new HashSet<Node>();
-        Queue<Node> priorityQueue = initQueue();
+        Set<Node> closedList = new HashSet<Node>();
+        Queue<Node> openList = initQueue();
 
         // Set starting node
-        Node startNode = new Node(BLANK, blank_r, blank_c);
-        priorityQueue.add(startNode);
+        Node startNode = new Node(copy(), null, 0);
+        openList.add(startNode);
 
         // Aystaaah
-        while(!priorityQueue.isEmpty()) {
-            current = priorityQueue.poll();    // Remove lowest cost node
+        while(!openList.isEmpty()) {
+            current = openList.poll();    // Remove lowest cost node
+            closedList.add(current);
 
-            // If goal is reached, return
-            if (solved()) {
-                break;
+            if (!closedList.contains(current)) {
+                closedList.add(current);
+                // If goal is reached, return
+                if (isSolved(current)) {
+                    break;
+                }
+
+                Set<Node>
             }
+
+
+
 
             // For each neighbor of n:
-            for (Edge neighbor : current.neighbors) {
-                Node child = neighbor.target;
-                int cost = neighbor.cost;
-                
-            }
+
         }
         return new LinkedList<NumberPuzzle>();
     }
