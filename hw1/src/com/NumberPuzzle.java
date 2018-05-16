@@ -1,5 +1,8 @@
 package com;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.util.*;
 
 // Solving the 16-puzzle with A* using two heuristics:
@@ -29,22 +32,30 @@ public class NumberPuzzle {
 
     static NumberPuzzle readPuzzle() {
         NumberPuzzle newPuzzle = new NumberPuzzle();
+        String fileName = "/home/piraka9011/IdeaProjects/CS4100/hw1/src/com/sixteenMoves.txt";
+        File file = new File(fileName);
+//        Scanner myScanner = new Scanner(System.in);
+        try {
+            Scanner myScanner = new Scanner(file);
 
-        Scanner myScanner = new Scanner(System.in);
-        int row = 0;
-        while (myScanner.hasNextLine() && row < PUZZLE_WIDTH) {
-            String line = myScanner.nextLine();
-            String[] numStrings = line.split(" ");
-            for (int i = 0; i < PUZZLE_WIDTH; i++) {
-                if (numStrings[i].equals("-")) {
-                    newPuzzle.tiles[row][i] = BLANK;
-                    newPuzzle.blank_r = row;
-                    newPuzzle.blank_c = i;
-                } else {
-                    newPuzzle.tiles[row][i] = new Integer(numStrings[i]);
+            int row = 0;
+            while (myScanner.hasNextLine() && row < PUZZLE_WIDTH) {
+                String line = myScanner.nextLine();
+                String[] numStrings = line.split(" ");
+                for (int i = 0; i < PUZZLE_WIDTH; i++) {
+                    if (numStrings[i].equals("-")) {
+                        newPuzzle.tiles[row][i] = BLANK;
+                        newPuzzle.blank_r = row;
+                        newPuzzle.blank_c = i;
+                    } else {
+                        newPuzzle.tiles[row][i] = new Integer(numStrings[i]);
+                    }
                 }
+                row++;
             }
-            row++;
+        }
+        catch (FileNotFoundException e) {
+            System.out.println("File not found");
         }
         return newPuzzle;
     }
@@ -95,9 +106,9 @@ public class NumberPuzzle {
 
         private void setCost() {
             if (BETTER)
-                this.f = g + getManhattanDistance();
+                this.f = this.g + getManhattanDistance();
             else
-                this.f = g + getPlaceHeuristic();
+                this.f = this.g + getPlaceHeuristic();
         }
 
         public boolean isSolved() {
@@ -171,10 +182,16 @@ public class NumberPuzzle {
                 newCol = j + bCol;
                 if (isInBounds(newRow, newCol)) {
                     // Create a new neighbor
-                    newNode = new Node(n.state.copy(), n, n.g);
+                    newNode = new Node(n.state.copy(), n, n.f);
                     // Move the tile
+//                    System.out.println(newNode.state.toString());
+//                    System.out.println(newNode.state.tiles[bRow][bCol]);
+//                    System.out.println(n.state.tiles[newRow][newCol]);
                     newNode.state.tiles[bRow][bCol] = n.state.tiles[newRow][newCol];
                     newNode.state.tiles[newRow][newCol] = BLANK;
+                    System.out.println(newNode.state.toString());
+                    newNode.state.blank_c = newCol;
+                    newNode.state.blank_r = newRow;
                     // Add to list of neighbors
                     neighbors.add(newNode);
                 }
