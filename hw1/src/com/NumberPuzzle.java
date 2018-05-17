@@ -1,3 +1,17 @@
+/**
+ * @author: Anas Abou Allaban
+ * Username: piraka9011
+ *
+ * Question:
+ * If we use the euclidean distance, we will be overly optimistic in estimating the number of moves
+ * to a certain location. Moving diagonally for example requires 2 moves, which the Manhattan
+ * heuristic correctly calculates, while the Euclidean heuristic would calculate it as 1 move.
+ *
+ * Times:
+ *
+ * Heuristic: Manhattan, Hamming
+ * Time: 99.614723 ms,
+ */
 package com;
 
 import java.io.File;
@@ -12,7 +26,7 @@ public class NumberPuzzle {
     public static final int PUZZLE_WIDTH = 4;
     public static final int BLANK = 0;
     // BETTER:  false for tiles-displaced heuristic, true for Manhattan distance
-    public static boolean BETTER = false;
+    public static boolean BETTER = true;
 
     // You can change this representation if you prefer.
     // If you don't, be careful about keeping the tiles and the blank
@@ -21,9 +35,15 @@ public class NumberPuzzle {
     private int blank_r, blank_c;   // blank row and column
 
     public static void main(String[] args) {
+        float startTime = System.nanoTime();
         NumberPuzzle myPuzzle = readPuzzle();
         LinkedList<NumberPuzzle> solutionSteps = myPuzzle.solve(BETTER);
         printSteps(solutionSteps);
+        float endTime = System.nanoTime();
+        float duration = (endTime - startTime) / 1000000;
+        String heuristic = (BETTER) ? "Manhattan" : "Tile Place";
+        System.out.printf("Heuristic: %s\n", heuristic);
+        System.out.printf("Time: %f ms\n", duration);
     }
 
     NumberPuzzle() {
@@ -32,12 +52,9 @@ public class NumberPuzzle {
 
     static NumberPuzzle readPuzzle() {
         NumberPuzzle newPuzzle = new NumberPuzzle();
-        String fileName = "/home/piraka9011/IdeaProjects/CS4100/hw1/src/com/sixteenMoves.txt";
-        File file = new File(fileName);
-//        Scanner myScanner = new Scanner(System.in);
         try {
+            File file = new File("/home/piraka9011/IdeaProjects/CS4100/hw1/src/com/sixteenMoves.txt");
             Scanner myScanner = new Scanner(file);
-
             int row = 0;
             while (myScanner.hasNextLine() && row < PUZZLE_WIDTH) {
                 String line = myScanner.nextLine();
@@ -55,8 +72,27 @@ public class NumberPuzzle {
             }
         }
         catch (FileNotFoundException e) {
-            System.out.println("File not found");
+            System.out.println("No file found");
         }
+
+//        Scanner myScanner = new Scanner(System.in);
+//
+//        int row = 0;
+//        while (myScanner.hasNextLine() && row < PUZZLE_WIDTH) {
+//            String line = myScanner.nextLine();
+//            String[] numStrings = line.split(" ");
+//            for (int i = 0; i < PUZZLE_WIDTH; i++) {
+//                if (numStrings[i].equals("-")) {
+//                    newPuzzle.tiles[row][i] = BLANK;
+//                    newPuzzle.blank_r = row;
+//                    newPuzzle.blank_c = i;
+//                } else {
+//                    newPuzzle.tiles[row][i] = new Integer(numStrings[i]);
+//                }
+//            }
+//            row++;
+//        }
+
         return newPuzzle;
     }
 
@@ -90,11 +126,40 @@ public class NumberPuzzle {
         return clone;
     }
 
+    public boolean solved() {
+        int shouldBe = 1;
+        for (int i = 0; i < PUZZLE_WIDTH; i++) {
+            for (int j = 0; j < PUZZLE_WIDTH; j++) {
+                if (tiles[i][j] != shouldBe) {
+                    return false;
+                } else {
+                    // Take advantage of BLANK == 0
+                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
+                }
+            }
+        }
+        return true;
+    }
+
+    static void printSteps(LinkedList<NumberPuzzle> steps) {
+        for (NumberPuzzle s : steps) {
+            System.out.println(s);
+        }
+    }
+
 /**----------------- Implementation -----------------**/
 /*----------------------- Node -----------------------*/
+
     class Node {
+    /**
+     * A Node class that stores the information of the puzzle state
+     * @param state: The current state of the puzzle tiles
+     * @param f: Current score of the node
+     * @param g: Cost to travel to node (usually 1)
+     * @param parent: The parent node, used to back track
+     */
         NumberPuzzle state;
-        int f = 0, g, h = 0;
+        int f = 0, g;
         Node parent;
 
         Node(NumberPuzzle state, Node parent, int cost) {
@@ -115,6 +180,7 @@ public class NumberPuzzle {
             return state.solved();
         }
 
+        /** Gets the (x,y) coordinates of a value*/
         private int[] getCoordinates(int num) {
             for (int row = 0; row < PUZZLE_WIDTH; row++) {
                 for (int col = 0; col < PUZZLE_WIDTH; col++) {
@@ -125,6 +191,7 @@ public class NumberPuzzle {
             return new int[]{-1, -1};
         }
 
+        /** Returns the Manhattan Distance heuristic */
         private int getManhattanDistance() {
             int score = 0;
             int shouldBe = 1;
@@ -141,7 +208,7 @@ public class NumberPuzzle {
             return score;
         }
 
-        // Heuristic that returns the number of tiles out of place.
+        /** Returns the Hamming Distance heuristic */
         private int getPlaceHeuristic() {
             int numOutOfPlace = 0;
             int iterationNum = 1;
@@ -158,41 +225,42 @@ public class NumberPuzzle {
     }
 /*----------------------- Node -----------------------*/
 
-    /** Checks if row/col are within puzzle bounds **/
-    private boolean isInBounds(int i, int j) {
-        return ((i >= 0 && i <= PUZZLE_WIDTH-1) && (j >= 0 &&  j <= PUZZLE_WIDTH-1));
+    /** Checks if row/col are within puzzle bounds */
+    private boolean isOutOfBounds(int i, int j) {
+        return ((i < 0) || (j < 0) || (i >= PUZZLE_WIDTH) || (j >= PUZZLE_WIDTH));
     }
 
-    /** Returns a list of node neighbors (possible tile moves) **/
+    /** Returns a list of node neighbors (possible tile moves) */
     public LinkedList<Node> getNeighbors(Node n) {
         int bRow = n.state.blank_r;
         int bCol = n.state.blank_c;
         int newRow, newCol;
         Node newNode;
+        NumberPuzzle newState;
         LinkedList<Node> neighbors = new LinkedList<Node>();
 
         // Iterate through possible movements
         for (int i = -1; i < 2; i++) {
             for (int j = -1; j < 2; j++) {
-                // Avoid diagonal moves
+                // Avoid same tile and diagonal moves
                 if ((i*j != 0) || (i == j))
                     continue;
                 // Check bounds
                 newRow = i + bRow;
                 newCol = j + bCol;
-                if (isInBounds(newRow, newCol)) {
+                if (!isOutOfBounds(newRow, newCol)) {
                     // Create a new neighbor
-                    newNode = new Node(n.state.copy(), n, n.f);
+                    newState = n.state.copy();
                     // Move the tile
-//                    System.out.println(newNode.state.toString());
-//                    System.out.println(newNode.state.tiles[bRow][bCol]);
-//                    System.out.println(n.state.tiles[newRow][newCol]);
-                    newNode.state.tiles[bRow][bCol] = n.state.tiles[newRow][newCol];
-                    newNode.state.tiles[newRow][newCol] = BLANK;
-                    System.out.println(newNode.state.toString());
+                    newState.tiles[bRow][bCol] = n.state.tiles[newRow][newCol];
+                    newState.tiles[newRow][newCol] = BLANK;
+                    // Add to list of neighbors and update blank location.
+                    // We add the new node after updating the tiles since the
+                    // cost is calculated only when the node is generated.
+                    // The cost (g) of going to a new state is 1 (not f!)
+                    newNode = new Node(newState, n, 1);
                     newNode.state.blank_c = newCol;
                     newNode.state.blank_r = newRow;
-                    // Add to list of neighbors
                     neighbors.add(newNode);
                 }
             }
@@ -200,18 +268,21 @@ public class NumberPuzzle {
         return neighbors;
     }
 
-    /** Iterates from solution through parents to get a path **/
+    /** Iterates from solution through parents to get a path */
     private LinkedList<NumberPuzzle> reconstructPath (Node n) {
         LinkedList<NumberPuzzle> puzzlePath = new LinkedList<NumberPuzzle>();
         Node currNode = n;
+        // For hacker rank...
+        puzzlePath.addFirst(currNode.state);
+        // Loop till the end
         while (currNode.parent != null) {
-            puzzlePath.add(currNode.state);
+            puzzlePath.addFirst(currNode.parent.state);
             currNode = currNode.parent;
         }
         return puzzlePath;
     }
 
-    /** Initialize a priority queue that sorts according to F score**/
+    /** Initialize a priority queue that sorts according to F score */
     private PriorityQueue<Node> initQueue() {
         return new PriorityQueue<>(32, new Comparator<Node>() {
             public int compare(Node n1, Node n2) {
@@ -225,16 +296,15 @@ public class NumberPuzzle {
         });
     }
 
-
     // betterH:  if false, use tiles-out-of-place heuristic
     //           if true, use total-manhattan-distance heuristic
     LinkedList<NumberPuzzle> solve(boolean betterH) {
         // Setup
         Node current;
-        int[] goalCoordinates;
 
         // Init Queue and explored nodes
         Queue<Node> openList = initQueue();
+        HashSet<Node> closedList = new HashSet<Node>();
 
         // Set starting node
         Node startNode = new Node(copy(), null, 0);
@@ -243,38 +313,23 @@ public class NumberPuzzle {
         // Aystaaah
         while(!openList.isEmpty()) {
             current = openList.poll();    // Remove lowest cost node
-
+            // Check if solved
             if (current.isSolved())
                 return reconstructPath(current);
-
+            // Add node to list of visited nodes
+            closedList.add(current);
+            // Iterate through neighbors
             LinkedList<Node> neighbors = getNeighbors(current);
             for (Node neighbor: neighbors) {
-                openList.add(neighbor);
+                // Check if already visited
+                if (closedList.contains(neighbor))
+                    continue;
+                // Check if not in the frontier
+                if (!openList.contains(neighbor))
+                    openList.add(neighbor);
             }
-
         }
         return new LinkedList<NumberPuzzle>();
-    }
-
-    public boolean solved() {
-        int shouldBe = 1;
-        for (int i = 0; i < PUZZLE_WIDTH; i++) {
-            for (int j = 0; j < PUZZLE_WIDTH; j++) {
-                if (tiles[i][j] != shouldBe) {
-                    return false;
-                } else {
-                    // Take advantage of BLANK == 0
-                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
-                }
-            }
-        }
-        return true;
-    }
-
-    static void printSteps(LinkedList<NumberPuzzle> steps) {
-        for (NumberPuzzle s : steps) {
-            System.out.println(s);
-        }
     }
 
 }
