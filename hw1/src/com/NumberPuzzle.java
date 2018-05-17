@@ -6,17 +6,19 @@
  * If we use the euclidean distance, we will be overly optimistic in estimating the number of moves
  * to a certain location. Moving diagonally for example requires 2 moves, which the Manhattan
  * heuristic correctly calculates, while the Euclidean heuristic would calculate it as 1 move.
+ * This will still work (tested with example function below).
+ * This will likely be less optimal than the Manhattan heuristic but will still be faster than the
+ * Hamming heuristic (see below times).
  *
- * Times:
+ * Times (Worst of 5):
  *
- * Heuristic: Manhattan, Hamming
- * Time: 99.614723 ms,
+ * Heuristic: Manhattan, Hamming, Euclidean
+ * Time : 99.614723 ms,  , 101.711868 ms
  */
 package com;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.util.*;
 
 // Solving the 16-puzzle with A* using two heuristics:
@@ -173,7 +175,7 @@ public class NumberPuzzle {
             if (BETTER)
                 this.f = this.g + getManhattanDistance();
             else
-                this.f = this.g + getPlaceHeuristic();
+                this.f = this.g + getHammingDistance();
         }
 
         public boolean isSolved() {
@@ -209,18 +211,40 @@ public class NumberPuzzle {
         }
 
         /** Returns the Hamming Distance heuristic */
-        private int getPlaceHeuristic() {
+        private int getHammingDistance() {
             int numOutOfPlace = 0;
-            int iterationNum = 1;
-            for (int col = 0; col < PUZZLE_WIDTH; col++) {
-                for (int row = 0; row < PUZZLE_WIDTH; row++) {
-                    if (tiles[row][col] != iterationNum) {
+            int shouldBe = 1;
+            for (int i = 0; i < PUZZLE_WIDTH; i++) {
+                for (int j = 0; j < PUZZLE_WIDTH; j++) {
+                    if (tiles[i][j] != shouldBe)
                         numOutOfPlace++;
-                    }
-                    iterationNum++;
+                    // Take advantage of BLANK == 0
+                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
                 }
             }
             return numOutOfPlace;
+        }
+
+        /** Returns the Euclidean distance heuristic*/
+        private double getEuclideanDistance() {
+            double score = 0.0;
+            int shouldBe = 1;
+            int[] currCoords;
+            int currRow, currCol;
+            double x, y;
+            for (int goalRow = 0; goalRow < PUZZLE_WIDTH; goalRow++) {
+                for (int goalCol = 0; goalCol < PUZZLE_WIDTH; goalCol++) {
+                    // Get where the solution tile actually is now
+                    currCoords = getCoordinates(shouldBe);
+                    currRow = currCoords[0]; currCol = currCoords[1];
+                    // Calc. euclidean distance
+                    x = Math.pow(goalRow - currRow, 2);
+                    y = Math.pow(goalCol - currCol, 2);
+                    score += Math.sqrt(x + y);
+                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
+                }
+            }
+            return score;
         }
     }
 /*----------------------- Node -----------------------*/
