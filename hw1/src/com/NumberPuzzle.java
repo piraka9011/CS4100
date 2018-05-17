@@ -28,7 +28,7 @@ public class NumberPuzzle {
     public static final int PUZZLE_WIDTH = 4;
     public static final int BLANK = 0;
     // BETTER:  false for tiles-displaced heuristic, true for Manhattan distance
-    public static boolean BETTER = true;
+    public static boolean BETTER = false;
 
     // You can change this representation if you prefer.
     // If you don't, be careful about keeping the tiles and the blank
@@ -216,7 +216,7 @@ public class NumberPuzzle {
             int shouldBe = 1;
             for (int i = 0; i < PUZZLE_WIDTH; i++) {
                 for (int j = 0; j < PUZZLE_WIDTH; j++) {
-                    if (tiles[i][j] != shouldBe)
+                    if (tiles[i][j] != shouldBe && tiles[i][j] != BLANK)
                         numOutOfPlace++;
                     // Take advantage of BLANK == 0
                     shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
@@ -326,7 +326,7 @@ public class NumberPuzzle {
         // Setup
         Node current;
 
-        // Init Queue and explored nodes
+        // Init frontier and explored nodes
         Queue<Node> openList = initQueue();
         HashSet<Node> closedList = new HashSet<Node>();
 
