@@ -12,8 +12,8 @@
  *
  * Times (Worst of 5):
  *
- * Heuristic: Manhattan, Hamming, Euclidean
- * Time : 99.614723 ms,  , 101.711868 ms
+ * Heuristic:   Manhattan,      Hamming,        Euclidean
+ * Time :       184.811523 ms,  126.746628 ms,  167.510010 ms
  */
 package com;
 
@@ -156,29 +156,20 @@ public class NumberPuzzle {
     /**
      * A Node class that stores the information of the puzzle state
      * @param state: The current state of the puzzle tiles
-     * @param f: Current score of the node
      * @param g: Cost to travel to node (usually 1)
      * @param parent: The parent node, used to back track
      */
         NumberPuzzle state;
-        int f = 0, g;
+        int g;
         Node parent;
 
         Node(NumberPuzzle state, Node parent, int cost) {
-            this.g = (parent != null) ? parent.g+cost : cost;
+            this.g = (parent != null) ? parent.g + cost : cost;
             this.state = state;
             this.parent = parent;
-            setCost();
         }
 
-        private void setCost() {
-            if (BETTER)
-                this.f = this.g + getManhattanDistance();
-            else
-                this.f = this.g + getHammingDistance();
-        }
-
-        public boolean isSolved() {
+        private boolean isSolved() {
             return state.solved();
         }
 
@@ -191,60 +182,6 @@ public class NumberPuzzle {
                 }
             }
             return new int[]{-1, -1};
-        }
-
-        /** Returns the Manhattan Distance heuristic */
-        private int getManhattanDistance() {
-            int score = 0;
-            int shouldBe = 1;
-            int[] currCoords;
-            int currRow, currCol;
-            for (int goalRow = 0; goalRow < PUZZLE_WIDTH; goalRow++) {
-                for (int goalCol = 0; goalCol < PUZZLE_WIDTH; goalCol++) {
-                    currCoords = getCoordinates(shouldBe);
-                    currRow = currCoords[0]; currCol = currCoords[1];
-                    score += Math.abs(goalRow - currRow) + Math.abs(goalCol - currCol);
-                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
-                }
-            }
-            return score;
-        }
-
-        /** Returns the Hamming Distance heuristic */
-        private int getHammingDistance() {
-            int numOutOfPlace = 0;
-            int shouldBe = 1;
-            for (int i = 0; i < PUZZLE_WIDTH; i++) {
-                for (int j = 0; j < PUZZLE_WIDTH; j++) {
-                    if (tiles[i][j] != shouldBe && tiles[i][j] != BLANK)
-                        numOutOfPlace++;
-                    // Take advantage of BLANK == 0
-                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
-                }
-            }
-            return numOutOfPlace;
-        }
-
-        /** Returns the Euclidean distance heuristic*/
-        private double getEuclideanDistance() {
-            double score = 0.0;
-            int shouldBe = 1;
-            int[] currCoords;
-            int currRow, currCol;
-            double x, y;
-            for (int goalRow = 0; goalRow < PUZZLE_WIDTH; goalRow++) {
-                for (int goalCol = 0; goalCol < PUZZLE_WIDTH; goalCol++) {
-                    // Get where the solution tile actually is now
-                    currCoords = getCoordinates(shouldBe);
-                    currRow = currCoords[0]; currCol = currCoords[1];
-                    // Calc. euclidean distance
-                    x = Math.pow(goalRow - currRow, 2);
-                    y = Math.pow(goalCol - currCol, 2);
-                    score += Math.sqrt(x + y);
-                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
-                }
-            }
-            return score;
         }
     }
 /*----------------------- Node -----------------------*/
@@ -306,18 +243,90 @@ public class NumberPuzzle {
         return puzzlePath;
     }
 
-    /** Initialize a priority queue that sorts according to F score */
-    private PriorityQueue<Node> initQueue() {
-        return new PriorityQueue<>(32, new Comparator<Node>() {
-            public int compare(Node n1, Node n2) {
-                if (n1.f > n2.f)
-                    return 1;
-                else if (n1.f < n2.f)
-                    return -1;
-                else
-                    return 0;
+    /** Priority Queue comparator implementation for the Manhattan Distance heuristic. */
+    class ManhattanDistance implements Comparator<Node> {
+
+        private int getManhattanDistance(Node n) {
+            int score = 0;
+            int shouldBe = 1;
+            int[] currCoords;
+            int currRow, currCol;
+            for (int goalRow = 0; goalRow < PUZZLE_WIDTH; goalRow++) {
+                for (int goalCol = 0; goalCol < PUZZLE_WIDTH; goalCol++) {
+                    currCoords = n.getCoordinates(shouldBe);
+                    currRow = currCoords[0]; currCol = currCoords[1];
+                    score += Math.abs(goalRow - currRow) + Math.abs(goalCol - currCol);
+                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
+                }
             }
-        });
+            return score;
+        }
+
+        @Override
+        public int compare(Node n1, Node n2) {
+            int cost = (n1.g + getManhattanDistance(n1)) - (n2.g + getManhattanDistance(n2));
+            if (cost == 0)
+                cost = n2.g - n1.g;
+            return cost;
+        }
+    }
+
+    /** Priority Queue comparator implementation for the Hamming Distance heuristic. */
+    class HammingDistance implements Comparator<Node> {
+        public int getHammingDistance(Node n) {
+            int numOutOfPlace = 0;
+            int shouldBe = 1;
+            for (int i = 0; i < PUZZLE_WIDTH; i++) {
+                for (int j = 0; j < PUZZLE_WIDTH; j++) {
+                    if (n.state.tiles[i][j] != shouldBe && n.state.tiles[i][j] != BLANK)
+                        numOutOfPlace++;
+                    // Take advantage of BLANK == 0
+                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
+                }
+            }
+            return numOutOfPlace;
+        }
+
+        @Override
+        public int compare(Node n1, Node n2) {
+            int cost = (n1.g + getHammingDistance(n1)) - (n2.g + getHammingDistance(n2));
+            if (cost == 0)
+                cost = n2.g - n1.g;
+            return cost;
+        }
+    }
+
+    /** Priority Queue comparator implementation for the Euclidean Distance heuristic. */
+    class EuclideanDistance implements Comparator<Node> {
+
+        private double getEuclideanDistance(Node n) {
+            double score = 0.0;
+            int shouldBe = 1;
+            int[] currCoords;
+            int currRow, currCol;
+            double x, y;
+            for (int goalRow = 0; goalRow < PUZZLE_WIDTH; goalRow++) {
+                for (int goalCol = 0; goalCol < PUZZLE_WIDTH; goalCol++) {
+                    // Get where the solution tile actually is now
+                    currCoords = n.getCoordinates(shouldBe);
+                    currRow = currCoords[0]; currCol = currCoords[1];
+                    // Calc. euclidean distance
+                    x = Math.pow(goalRow - currRow, 2);
+                    y = Math.pow(goalCol - currCol, 2);
+                    score += Math.sqrt(x + y);
+                    shouldBe = (shouldBe + 1) % (PUZZLE_WIDTH*PUZZLE_WIDTH);
+                }
+            }
+            return score;
+        }
+
+        @Override
+        public int compare(Node n1, Node n2) {
+            double cost = (n1.g + getEuclideanDistance(n1)) - (n2.g + getEuclideanDistance(n2));
+            if (cost == 0)
+                cost = n2.g - n1.g;
+            return (int) cost;
+        }
     }
 
     // betterH:  if false, use tiles-out-of-place heuristic
@@ -327,8 +336,12 @@ public class NumberPuzzle {
         Node current;
 
         // Init frontier and explored nodes
-        Queue<Node> openList = initQueue();
+        Queue<Node> openList;
         HashSet<Node> closedList = new HashSet<Node>();
+        if (betterH)
+            openList = new PriorityQueue<>(9999, new ManhattanDistance());
+        else
+            openList = new PriorityQueue<>(9999, new HammingDistance());
 
         // Set starting node
         Node startNode = new Node(copy(), null, 0);
