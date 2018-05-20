@@ -1,10 +1,10 @@
+/**
+ * @author: Anas Abou Allaban
+ * An implementation of the Minimax algorithm with Alpha-Beta pruning for a game of Othello.
+ */
 package com;
 
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
+import java.io.*;
 import java.util.Random;
 import java.util.ArrayList;
 import java.util.Scanner;
@@ -46,11 +46,18 @@ public class OthelloSolver {
 			play();
 			System.exit(0);
 		}
-		Scanner myScanner = new Scanner(System.in);
+		try {
+			File myFile = new File("/home/piraka9011/IdeaProjects/CS4100/hw2/src/com/test.txt");
+			Scanner myScanner = new Scanner(myFile);
+//		Scanner myScanner = new Scanner(System.in);
 		int searchDepth = readDepth(myScanner);
 		int[][] board = readBoard(myScanner);
 		System.out.println(minimax_value(board, WHITE_TO_PLAY, searchDepth, Float.NEGATIVE_INFINITY,
 						   Float.POSITIVE_INFINITY));
+		}
+		catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
 	}
 
 	static int readDepth(Scanner s) {
@@ -223,13 +230,20 @@ public class OthelloSolver {
 	}
 
 	static float evaluationFunction(int[][] board) {
-		int score = 0;
+		// Return the winning value if theres a winner
+		if (checkGameOver(board) == WHITE)
+			return WIN_VAL;
+		else if (checkGameOver(board) == BLACK)
+			return -WIN_VAL;
+
+		// Otherwise compute the board score
+		float score = 0;
 		for (int i = 0; i < NUM_COLUMNS; i++) {
 			for (int j = 0; j < NUM_COLUMNS; j++) {
 				score += board[i][j];
 			}
 		}
-        return (float) score;
+        return score;
 	}
 
 	static int checkGameOver(int[][] board) {
@@ -247,49 +261,48 @@ public class OthelloSolver {
 	//-------
 
 	static float minimax_value(int board[][], boolean whiteTurn, int searchDepth, float alpha, float beta) {
+		// Setup
 		ArrayList<Move> validMoves;
-		System.out.println("Current board state:");
-		printBoard(board);
-		// Evaluate the score if we reach the search depth
-		if (searchDepth == 0)
+		float v;
+
+		// Evaluate the score if we reach the search depth or game is over
+		if (searchDepth == 0 || (checkGameOver(board) != NOBODY))
 			return evaluationFunction(board);
 
 		// Get list of valid moves
 		validMoves = generateLegalMoves(board, whiteTurn);
 
 		// If no moves, skip to next person
-		if (validMoves.isEmpty()) {
-			System.out.println("No valid moves, skipping turn");
+		if (validMoves.isEmpty())
 			return minimax_value(board, !whiteTurn, searchDepth, alpha, beta);
-		}
 
-		// Find best current move
-		Move bestMove;
-		for (Move move: validMoves) {
-			int[][] currentBoard = play(board, move, whiteTurn);
-			float currentV = minimax_value(currentBoard, !whiteTurn, searchDepth - 1, alpha, beta);
-			if (whiteTurn) {
-				// Update alpha/move if we find a better solution
-				if (currentV > alpha) {
-					alpha = currentV;
-					bestMove = move;
-				}
-				// Prune if needed
-				if (alpha >= beta) {
-					return alpha;
-				}
+		// Apply minimax with alpha-beta pruning
+		// Max-value
+		if (whiteTurn){
+			v = Float.NEGATIVE_INFINITY;
+			for (Move move: validMoves) {
+				int[][] currentBoard = play(board, move, whiteTurn);
+				v = Math.max(v, minimax_value(currentBoard, !whiteTurn, searchDepth-1, alpha, beta));
+				if (v >= beta)
+					return v;
+				// Prune
+				alpha = Math.max(v, alpha);
 			}
-			else {
-				if (currentV < beta) {
-					beta = currentV;
-					bestMove = move;
-				}
-				if (alpha >= beta) {
-					return beta;
-				}
-			}
+			return v;
 		}
-        return (float) 0.0;
+		// Min-value
+		else {
+			v = Float.POSITIVE_INFINITY;
+			for (Move move: validMoves) {
+				int[][] currentBoard = play(board, move, whiteTurn);
+				v = Math.min(v, minimax_value(currentBoard, !whiteTurn, searchDepth-1, alpha, beta));
+				if (v <= alpha)
+					return v;
+				// Prune
+				beta = Math.min(v, beta);
+			}
+			return v;
+		}
 	}
 	
     // Handy for debugging!  And used by the interactive player below.
