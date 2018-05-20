@@ -248,6 +248,8 @@ public class OthelloSolver {
 
 	static float minimax_value(int board[][], boolean whiteTurn, int searchDepth, float alpha, float beta) {
 		ArrayList<Move> validMoves;
+		System.out.println("Current board state:");
+		printBoard(board);
 		// Evaluate the score if we reach the search depth
 		if (searchDepth == 0)
 			return evaluationFunction(board);
@@ -255,17 +257,37 @@ public class OthelloSolver {
 		// Get list of valid moves
 		validMoves = generateLegalMoves(board, whiteTurn);
 
-		// Return winner if no valid moves available
+		// If no moves, skip to next person
 		if (validMoves.isEmpty()) {
-			return findWinner(board);
+			System.out.println("No valid moves, skipping turn");
+			return minimax_value(board, !whiteTurn, searchDepth, alpha, beta);
 		}
 
-		// Alternate between white and black turn
-		if (whiteTurn){
-
-		}
-		else {
-
+		// Find best current move
+		Move bestMove;
+		for (Move move: validMoves) {
+			int[][] currentBoard = play(board, move, whiteTurn);
+			float currentV = minimax_value(currentBoard, !whiteTurn, searchDepth - 1, alpha, beta);
+			if (whiteTurn) {
+				// Update alpha/move if we find a better solution
+				if (currentV > alpha) {
+					alpha = currentV;
+					bestMove = move;
+				}
+				// Prune if needed
+				if (alpha >= beta) {
+					return alpha;
+				}
+			}
+			else {
+				if (currentV < beta) {
+					beta = currentV;
+					bestMove = move;
+				}
+				if (alpha >= beta) {
+					return beta;
+				}
+			}
 		}
         return (float) 0.0;
 	}
