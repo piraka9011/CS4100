@@ -67,8 +67,8 @@ public class BayesianTomatoes {
     // the number of times a word starts any bigram (ie is not the last word)
     public static ArrayList<HashMap<String, Integer>> bigramDenoms;
 
-    public static int[] sentimentCounts;
-    public static int[] totalWords;
+    public static int[] sentimentCounts;    // Number of sentences in each sentiment
+    public static int[] totalWords;         // Total words in each sentiment
     public static int[] totalBigrams;
 
     public static class Classification {
@@ -89,7 +89,7 @@ public class BayesianTomatoes {
 
         try {
 //          Scanner myScanner = new Scanner(System.in);
-            File myFile = new File("train.tsv");
+            File myFile = new File("train2.tsv");
             Scanner myScanner = new Scanner(myFile);
             getModels(myScanner);
             classifySentences(myScanner);
@@ -97,8 +97,6 @@ public class BayesianTomatoes {
         catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-
-
     }
 
     public static void getModels(Scanner sc) {
@@ -186,43 +184,17 @@ public class BayesianTomatoes {
             String line = sc.nextLine();
             Classification nbClass = naiveBayesClassify(line);
             Classification mmClass = markovModelClassify(line);
-//            System.out.print(nbClass.toString() + mmClass.toString());
-            System.out.print(nbClass.toString());
+            System.out.print(nbClass.toString() + mmClass.toString());
         }
     }
 
-    // Sum of all words in sentimentCounts
-    public static int getTotalSentimentCount() {
-        int sum = 0;
-        for (int i = 0; i < sentimentCounts.length; i++) {
-            sum += sentimentCounts[i];
+    // Calculate the sum of all elements in sentimentCounts
+    public static double getSumSentimentCounts() {
+        double sum = 0;
+        for (int count: sentimentCounts) {
+            sum += count;
         }
         return sum;
-    }
-    
-    public static int getTotalWordCount(int sentiment) {
-        int sum = 0;
-        for (int i = 0; i < CLASSES; i++) {
-            HashMap<String, Integer> wordMap = wordCounts.get(i);
-            for (Map.Entry<String, Integer> entry : wordMap.entrySet()) {
-                sum += entry.getValue();
-            }
-        }
-
-        return sum;
-    }
-
-    // Pr(sentiment) = # of words in sentiment / # of total words
-    public static double getSentimentProbability(int numSentiment, int numTotalWords) {
-        return Math.log((double) numSentiment/numTotalWords);
-    }
-
-    public static double getWordProbability(int numWord, int numSentiment) {
-        return Math.log((double) numWord/numSentiment);
-    }
-
-    public static double getBigramProbability(int numBigram, int numFirstWord) {
-        return Math.log((double) numBigram/numFirstWord);
     }
 
     // Classify a new sentence using the data and a Naive Bayes model.
@@ -236,40 +208,38 @@ public class BayesianTomatoes {
         // Setup
         // Dictionary of counts for current word
         HashMap<String, Integer> currentWordCountMap;
-        // List of Pr(word | sentiment)
         double wordProbability;         // Pr(word | sentiment)
         double sentimentProbability;    // Pr(sentiment)
         double sentenceProbability;     // Pr(sentence | sentiment) * Pr(sentiment)
         double resultProbability  = Double.NEGATIVE_INFINITY; // Max(Pr(sentiment | sentence))
+        double currentSentimentCount;   // Current value of sentimentCounts
+        double currentTotalWords;       // Current value of totalWords
         int resultSentiment = -1;   // Sentiment classification to return
-        int count;                  // Count for each word
-        int currentSentimentCount;  // Count of words in sentiment
-        int currentTotalWords;      // Total words
-        int totalSentimentCount = getTotalSentimentCount(); // Total number of words assc. w/ sentiments
+        double count = 0.0;         // Number of words found with a particular sentiment
 
         // Iterate over all sentiments
         for (int sentiment = 0; sentiment < 5; sentiment++) {
+            // Update current vars
             currentWordCountMap = wordCounts.get(sentiment);
             currentSentimentCount = sentimentCounts[sentiment];
-            currentTotalWords = getTotalWordCount(sentiment);
-            sentimentProbability = getSentimentProbability(currentSentimentCount, totalSentimentCount);
+            currentTotalWords = totalWords[sentiment];
+            // Calculate Pr(sentiment)
+            sentimentProbability = Math.log(currentSentimentCount / getSumSentimentCounts());
             sentenceProbability = sentimentProbability;
 
             // Iterate over each word and get the total number of times it appears in the sentiment
-            for (int word = 0; word < words.length; word++) {
-                String currentWord = words[word];
-                // Make sure the word exists
-                if (currentWordCountMap.containsKey(currentWord))
-                    count = currentWordCountMap.get(currentWord);
-                else
-                    continue;
+            for (String word: words) {
+                // Make sure the word exists otherwise set it to OUT_OF_VOCAB
+                if (currentWordCountMap.containsKey(word)) {
+                    count = currentWordCountMap.get(word);
+                    // Calculate Pr(word | sentiment)
+                    wordProbability = Math.log(count / currentTotalWords);
+                }
+                else {
+                    wordProbability = Math.log(OUT_OF_VOCAB_PROB);
+                }
 
-                // Calculate probability
-                if (count == 0)
-                    wordProbability = OUT_OF_VOCAB_PROB;
-                else
-                    wordProbability = getWordProbability(count, currentTotalWords);
-                // Add to our list
+                // Add to Pr(sentiment | word)
                 sentenceProbability += wordProbability;
             }
 
@@ -291,27 +261,77 @@ public class BayesianTomatoes {
         String[] words = sentence.split(" ");
 
         // Setup
-        // Dictionary of counts for current word
+        // Dictionary of counts for current bigrams
+        HashMap<String, Integer> currentBigramCount;
+        HashMap<String, Integer> currentBigramDenom;
         HashMap<String, Integer> currentWordCountMap;
-        // List of Pr(word | sentiment)
-        ArrayList<Double> wordProbabilities = new ArrayList<Double>();
-        double wordProbability;         // Pr(word | sentiment)
+
+        double wordProbability;         // Pr(word_1)
+        double bigramProbability;       // Pr(word_i+1 | word_i)
         double sentimentProbability;    // Pr(sentiment)
         double sentenceProbability;     // Pr(sentence | sentiment) * Pr(sentiment)
         double resultProbability  = Double.NEGATIVE_INFINITY; // Max(Pr(sentiment | sentence))
         int resultSentiment = -1;   // Sentiment classification to return
-        int count;                  // Count for each word
-        int currentSentimentCount;  // Count of words in sentiment
-        int currentTotalWords;      // Total words
+        double bigramCount;         // Count for each bigram associated with a sentiment
+        double denomCount;          // Count for start of bigram
+        double currentSentimentCount;  // Count of words in sentiment
+        double currentTotalWords;      // Total words
         
-
+        // Iterate over all sentiments
         for (int sentiment = 0; sentiment < 5; sentiment++) {
+            // Update vars.
+            currentBigramCount = bigramCounts.get(sentiment);
+            currentBigramDenom = bigramDenoms.get(sentiment);
             currentWordCountMap = wordCounts.get(sentiment);
-            currentSentimentCount = currentWordCountMap.size();
+            currentSentimentCount = sentimentCounts[sentiment];
             currentTotalWords = totalWords[sentiment];
-            sentimentProbability = getSentimentProbability(currentSentimentCount, currentTotalWords);
+
+            // First calculate Pr(sentiment)
+            sentimentProbability = Math.log(currentSentimentCount / getSumSentimentCounts());
+            sentenceProbability = sentimentProbability;
+
+            // Iterate over all words in the sentence
+            for (int i = 0; i < words.length; i++) {
+                // Check if its the first word
+                if (i == 0) {
+                    // Make sure it exists and calc. Pr(word_1)
+                    if (currentWordCountMap.containsKey(words[i])) {
+                        bigramCount = currentWordCountMap.get(words[i]);
+                        wordProbability = Math.log(bigramCount / currentTotalWords);
+                    }
+                    // Otherwise assign OUT_OF_VOCAB_PROB
+                    else {
+                        wordProbability = Math.log(OUT_OF_VOCAB_PROB);
+                    }
+                    // Update Pr(sentiment | sentence)
+                    sentenceProbability += wordProbability;
+                }
+                // If its not the first word, get the bigram probability
+                else {
+                    String prevWord = words[i-1];
+                    String bigram = prevWord + " " + words[i];
+                    // Make sure it exists and calculate Pr(w2 | w1)
+                    if (currentBigramCount.containsKey(bigram) && currentBigramDenom.containsKey(prevWord)) {
+                        bigramCount = currentBigramCount.get(bigram);
+                        denomCount = currentBigramDenom.get(prevWord);
+                        bigramProbability = Math.log(bigramCount / denomCount);
+                    }
+                    else {
+                        bigramProbability = Math.log(OUT_OF_VOCAB_PROB);
+                    }
+                    // Update Pr(sentiment | sentence)
+                    sentenceProbability += bigramProbability;
+                }
+            }
+
+            // Check if we found the largest probability
+            if (sentenceProbability > resultProbability) {
+                resultProbability = sentenceProbability;
+                resultSentiment = sentiment;
+            }
         }
-        return new Classification(-1,0);
+
+        return new Classification(resultSentiment,resultProbability);
     }
 }
 
