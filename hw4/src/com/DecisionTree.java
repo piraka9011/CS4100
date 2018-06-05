@@ -33,8 +33,10 @@ public class DecisionTree {
     public static void main(String[] args) {
         try {
 //            Scanner scanner = new Scanner(System.in);
-//            File myFile = new File("adult.data.csv");
-            File myFile = new File("test1.txt");
+            File myFile = new File("adult.data.csv");
+//            File myFile = new File("test1.txt");
+//            File myFile = new File("test2.txt");
+//            File myFile = new File("testSig.txt");
 
             Scanner scanner = new Scanner(myFile);
             // Keep header line around for interpreting decision trees
@@ -42,9 +44,8 @@ public class DecisionTree {
             Feature.featureNames = header.split(",");
             System.err.println("Reading training examples...");
             ArrayList<Example> trainExamples = readExamples(scanner);
-            HashSet<Feature> allFeatures = generateFeatures(trainExamples);
             // We'll assume a delimiter of "---" separates train and test as before
-            DecisionTree tree = new DecisionTree(trainExamples, allFeatures);
+            DecisionTree tree = new DecisionTree(trainExamples);
             System.out.println(tree);
             System.out.println("Training data results: ");
             System.out.println(tree.classify(trainExamples));
@@ -245,7 +246,7 @@ public class DecisionTree {
         return numTrue;
     }
 
-    public double getNegativeTarget(ArrayList<Example> examples) {
+    public double getNegativeTargetCount(ArrayList<Example> examples) {
         double numFalse = 0;
         for (Example example : examples) {
             if (!example.target)
@@ -255,7 +256,7 @@ public class DecisionTree {
     }
 
     public double getEntropy(ArrayList<Example> examples) {
-        if(examples.size() <= 1)
+        if(examples.size() == 1)
             return 0.0;
         else {
             double numTrue = getPositiveTargetCount(examples);
@@ -268,41 +269,42 @@ public class DecisionTree {
 
     public ArrayList<ArrayList<Example>> splitExamples(ArrayList<Example> examples, Feature feature) {
         // Setup
-        ArrayList<Example> positiveFeatures = new ArrayList<Example>();
-        ArrayList<Example> negativeFeatures = new ArrayList<Example>();
-        ArrayList<ArrayList<Example>> splitFeatures = new ArrayList<ArrayList<Example>>();
+        ArrayList<Example> positiveExamples = new ArrayList<Example>();
+        ArrayList<Example> negativeExamples = new ArrayList<Example>();
+        ArrayList<ArrayList<Example>> splitExamples = new ArrayList<ArrayList<Example>>();
 
         // Iterate over all examples and get only ones with feature we want
         for (Example example: examples) {
             if (feature.apply(example))
-                positiveFeatures.add(example);
+                positiveExamples.add(example);
             else
-                negativeFeatures.add(example);
+                negativeExamples.add(example);
         }
-        splitFeatures.add(positiveFeatures);
-        splitFeatures.add(negativeFeatures);
-        return splitFeatures;
-    }
-
-    public ArrayList<Example> examplesWithFeature(ArrayList<Example> examples, Feature feature) {
-        ArrayList<Example> positiveFeatures = new ArrayList<Example>();
-        for (Example example : examples) {
-            if (feature.apply(example))
-                positiveFeatures.add(example);
-        }
-        return positiveFeatures;
+        splitExamples.add(positiveExamples);
+        splitExamples.add(negativeExamples);
+        return splitExamples;
     }
 
     public Feature bestSplit(ArrayList<Example> examples, HashSet<Feature> features) {
         Feature bestFeature = null;
-        double minEntropy = Double.POSITIVE_INFINITY;
-
+        double minGain = Double.POSITIVE_INFINITY;
+        ArrayList<ArrayList<Example>> splitExamples = new ArrayList<>();
         // Iterate over all features and find the one with the least entropy
         for (Feature feature : features) {
-            ArrayList<Example> examplesWithFeature = examplesWithFeature(examples, feature);
-            double currentEntropy = getEntropy(examplesWithFeature);
-            if (currentEntropy < minEntropy) {
-                minEntropy = currentEntropy;
+            // Split the examples based on the current feature
+            splitExamples = splitExamples(examples, feature);
+            ArrayList<Example> positiveExamples = splitExamples.get(0);
+            ArrayList<Example> negativeExamples = splitExamples.get(1);
+            // Calculate entropy for positive and negative examples
+            double positiveEntropy = getEntropy(positiveExamples);
+            double negativeEntropy = getEntropy(negativeExamples);
+            // Calculate probability of positive and negative examples
+            double positiveProbability = getPositiveTargetCount(positiveExamples) / positiveExamples.size();
+            double negativeProbability = getNegativeTargetCount(negativeExamples) / negativeExamples.size();
+            // Calculate information gain
+            double currentGain = (positiveEntropy * positiveProbability) + (negativeEntropy * negativeProbability);
+            if (currentGain < minGain) {
+                minGain = currentGain;
                 bestFeature = feature;
             }
         }
@@ -322,22 +324,84 @@ public class DecisionTree {
         return true;
     }
 
-    // This constructor should create the whole decision tree recursively.
-    DecisionTree(ArrayList<Example> examples, HashSet<Feature> features) {
-        Feature bestSplitFeature = bestSplit(examples, features);
-        ArrayList<ArrayList<Example>> splitExamples = splitExamples(examples, bestSplitFeature);
-        features.remove(bestSplitFeature);
-        this.feature = bestSplitFeature;
-        yesBranch = new DecisionTree(splitExamples.get(0), );
-        noBranch = new DecisionTree(splitExamples.get(1));
+    public boolean getMajorityTarget(ArrayList<Example> examples) {
+        int numTrue = 0, numFalse = 0;
+        for (Example example : examples) {
+            if (example.target)
+                numTrue++;
+            else
+                numFalse++;
+        }
 
+        if (numTrue >= numFalse)
+            return true;
+        else
+            return false;
     }
 
-//    public class RootNode extends DecisionTree {
-//        public RootNode(boolean decision) {
-//            this.decision = decision;
-//        }
-//    }
+    public double chiSquareTest(ArrayList<Example> positiveExamples, ArrayList<Example> negativeExamples) {
+        // ------------ Data 1 ----- Data 2 ----- Totals
+        // Category 1     a            b           a+b
+        // Category 2     c            d           c+d
+        // Total         a+c          b+d        a+b+c+d
+        double a = getPositiveTargetCount(positiveExamples);
+        double b = getPositiveTargetCount(negativeExamples);
+        double c = getNegativeTargetCount(positiveExamples);
+        double d = getNegativeTargetCount(negativeExamples);
+        double ac = a + c;  double ab = a + b;  double bd = b + d; double cd = c + d;
+        double total = a + b + c + d;
+        double chiNumerator = Math.pow((a*d) - (b*c), 2) * total;
+        double chiDenomenator = ab * ac * cd * bd;
+        return chiNumerator / chiDenomenator;
+    }
+
+    // This constructor should create the whole decision tree recursively.
+    DecisionTree(ArrayList<Example> examples) {
+        // If we have a pure example set, we don't need to split and we have our decision
+        if (isPure(examples)){
+            this.decision = examples.get(0).target;
+            this.feature = null;
+        }
+        else {
+            // Get all the features in our example set
+            HashSet<Feature> allFeatures = generateFeatures(examples);
+            // Find the best feature to split on based on max information gain
+            Feature bestSplitFeature = bestSplit(examples, allFeatures);
+            if (bestSplitFeature == null) {
+                this.decision = getMajorityTarget(examples);
+                this.feature = null;
+            }
+            else {
+                // Split the examples based on the best feature
+                ArrayList<ArrayList<Example>> splitExamples = splitExamples(examples, bestSplitFeature);
+                this.feature = bestSplitFeature;
+                ///----- Pruning
+                if (PRUNE) {
+                    double threshold = chiSquareTest(splitExamples.get(0), splitExamples.get(1));
+                    if (threshold < CHI_THRESH) {
+                        this.decision = getMajorityTarget(examples);
+                        this.feature = null;
+                    } else {
+                        if (!splitExamples.get(0).isEmpty())
+                            yesBranch = new DecisionTree(splitExamples.get(0));
+                        if (!splitExamples.get(1).isEmpty())
+                            noBranch = new DecisionTree(splitExamples.get(1));
+                    }
+                }
+                ///----- End Pruning
+                ///----- Non-pruned tree
+                else {
+                    // Recurse and split branches down as needed
+                    //             || examples.size() != splitExamples.get(0).size()    || examples.size() != splitExamples.get(1).size()
+                    if (!splitExamples.get(0).isEmpty())
+                        yesBranch = new DecisionTree(splitExamples.get(0));
+                    if (!splitExamples.get(1).isEmpty())
+                        noBranch = new DecisionTree(splitExamples.get(1));
+                }
+            }
+        }
+    }
+
 
     public static class Results {
         public int true_positive;  // correctly classified "yes"
@@ -364,12 +428,46 @@ public class DecisionTree {
         }
     }
 
+    public boolean recursiveClassify(DecisionTree branch, Feature feature, Example example) {
+        // Leaf node is when the feature is null
+        if (feature == null)
+            return branch.decision;
+        // Otherwise keep going down the tree
+        else {
+            // yesBranch if feature applies, noBranch if it doesn't
+            if (feature.apply(example))
+                return recursiveClassify(branch.yesBranch, branch.yesBranch.feature, example);
+            else
+                return recursiveClassify(branch.noBranch, branch.noBranch.feature, example);
+        }
+    }
+
     public Results classify(ArrayList<Example> examples) {
         Results results = new Results();
-        // TODO your code here, classifying each example with the tree and comparing to
-        // the truth to populate the results structure
-        for (Example example : examples) {
 
+        boolean result;
+        for (Example example : examples) {
+            // Recurse down the branches to get decision
+            if (feature == null)
+                result = this.decision;
+            else if (feature.apply(example))
+                result = recursiveClassify(yesBranch, yesBranch.feature, example);
+            else
+                result = recursiveClassify(noBranch, noBranch.feature, example);
+
+            /// Results
+            // True Positive: If event and prediction positive
+            if (example.target && result)
+                results.true_positive++;
+            // True Negative: If event negative and prediction negative
+            if (!example.target && !result)
+                results.true_negative++;
+            // False Positive: If event negative and prediction positive
+            if (!example.target && result)
+                results.false_positive++;
+            // False Negative: If event positive and prediction negative
+            if (example.target && !result)
+                results.false_negative++;
         }
         return results;
     }
@@ -401,3 +499,19 @@ public class DecisionTree {
     }
 
 }
+
+
+//    ArrayList<Example> positiveExamples = splitExamples.get(0);
+//    ArrayList<Example> negativeExamples = splitExamples.get(1);
+//    /// Observed Counts
+//    // Split A
+//    double observedTrueCountsPositive = getPositiveTargetCount(positiveExamples);
+//    double observedTrueCountsNegative = getPositiveTargetCount(negativeExamples);
+//    // Split B
+//    double observedFalseCountsPositive = getNegativeTargetCount(positiveExamples);
+//    double observedFalseCountsNegative = getNegativeTargetCount(negativeExamples);
+//    /// Expected Counts
+//    double totalCounts = examples.size();
+//    // Split A
+//    double expectedTrueCountsPositive = positiveExamples.size() * (getPositiveTargetCount(examples) / totalCounts);
+//    double expectedTrueCountsNegative = negativeExamples.size() * (getPositiveTargetCount(examples) / totalCounts);
