@@ -1,6 +1,5 @@
 package com;
 
-import javax.crypto.ExemptionMechanism;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
@@ -34,8 +33,8 @@ public class DecisionTree {
     public static void main(String[] args) {
         try {
 //            Scanner scanner = new Scanner(System.in);
-            File myFile = new File("adult.data.csv");
-//            File myFile = new File("test1.txt");
+//            File myFile = new File("adult.data.csv");
+            File myFile = new File("test1.txt");
 
             Scanner scanner = new Scanner(myFile);
             // Keep header line around for interpreting decision trees
@@ -206,6 +205,8 @@ public class DecisionTree {
         }
     }
 
+    /**----- Implementation -----**/
+
     public double log2(double x) {
         if (x <= 0)
             return 0.0;
@@ -213,7 +214,7 @@ public class DecisionTree {
             return Math.log(x) / Math.log(2);
     }
 
-    public double getPositiveTarget(ArrayList<Example> examples) {
+    public double getPositiveTargetCount(ArrayList<Example> examples) {
         double numTrue = 0;
         for (Example example : examples) {
             if (example.target)
@@ -232,36 +233,42 @@ public class DecisionTree {
     }
 
     public double getEntropy(ArrayList<Example> examples) {
-        double numTrue = getPositiveTarget(examples);
-        double numFalse = getNegativeTarget(examples);
-        double total = examples.size();
-        double probabilityTrue = numTrue/total;
-        double probabilityFalse = numFalse/total;
-        double entropy = -(probabilityTrue * log2(probabilityTrue)) - (probabilityFalse * log2(probabilityFalse));
-        return entropy;
+        if(examples.size() <= 1)
+            return 0.0;
+        else {
+            double numTrue = getPositiveTargetCount(examples);
+            double total = examples.size();
+            double probabilityTrue = numTrue/total;
+            double probabilityFalse = 1 - probabilityTrue;
+            return -(probabilityTrue * log2(probabilityTrue)) - (probabilityFalse * log2(probabilityFalse));
+        }
     }
 
-    public ArrayList<Example> getExampleFeatures(ArrayList<Example> examples, Feature feature) {
-        // Get data
-        int feautureNum = feature.featureNum;
-        boolean isNum = feature.isNumerical[feautureNum];
-        double featureDVal = feature.dvalue;
-        String featureSVal = feature.svalue;
-        ArrayList<Example> examplesWithFeature = new ArrayList<Example>();
+    public ArrayList<ArrayList<Example>> splitExamples(ArrayList<Example> examples, Feature feature) {
+        // Setup
+        ArrayList<Example> positiveFeatures = new ArrayList<Example>();
+        ArrayList<Example> negativeFeatures = new ArrayList<Example>();
+        ArrayList<ArrayList<Example>> splitFeatures = new ArrayList<ArrayList<Example>>();
 
         // Iterate over all examples and get only ones with feature we want
         for (Example example: examples) {
-            if (isNum) {
-                if (example.numericals[feautureNum] == featureDVal)
-                    examplesWithFeature.add(example);
-            }
-            else {
-                if (example.strings[feautureNum].equals(featureSVal))
-                    examplesWithFeature.add(example);
-            }
+            if (feature.apply(example))
+                positiveFeatures.add(example);
+            else
+                negativeFeatures.add(example);
         }
+        splitFeatures.add(positiveFeatures);
+        splitFeatures.add(negativeFeatures);
+        return splitFeatures;
+    }
 
-        return examplesWithFeature;
+    public ArrayList<Example> examplesWithFeature(ArrayList<Example> examples, Feature feature) {
+        ArrayList<Example> positiveFeatures = new ArrayList<Example>();
+        for (Example example : examples) {
+            if (feature.apply(example))
+                positiveFeatures.add(example);
+        }
+        return positiveFeatures;
     }
 
     public Feature bestSplit(ArrayList<Example> examples, HashSet<Feature> features) {
@@ -270,7 +277,7 @@ public class DecisionTree {
 
         // Iterate over all features and find the one with the least entropy
         for (Feature feature : features) {
-            ArrayList<Example> examplesWithFeature = getExampleFeatures(examples, feature);
+            ArrayList<Example> examplesWithFeature = examplesWithFeature(examples, feature);
             double currentEntropy = getEntropy(examplesWithFeature);
             if (currentEntropy < minEntropy) {
                 minEntropy = currentEntropy;
@@ -281,12 +288,50 @@ public class DecisionTree {
         return bestFeature;
     }
 
+    public HashSet<Feature> generateFeatures(ArrayList<Example> examples) {
+        HashSet<Feature> allFeatures  = new HashSet<Feature>();
+        for (Example example : examples) {
+            for (int i = 0; i < example.strings.length; i++) {
+                // Skip the target column
+                if (Feature.featureNames[i].equals("Target"))
+                    continue;
+                // Otherwise, add feature if its either numerical or string
+                if (Feature.isNumerical[i]){
+                    Feature newFeature = new Feature(i, example.numericals[i]);
+                    allFeatures.add(newFeature);
+                }
+                else {
+                    Feature newFeature = new Feature(i, example.strings[i]);
+                    allFeatures.add(newFeature);
+                }
+            }
+        }
+        return allFeatures;
+    }
+
+    public boolean isPure(ArrayList<Example> examples) {
+        // Get the first target element
+        boolean result = examples.get(0).target;
+        // If one of the examples are different, we don't have a pure set
+        for (Example example: examples) {
+            if (result != example.target)
+                return false;
+        }
+        // All examples have the same target
+        return true;
+    }
+
     // This constructor should create the whole decision tree recursively.
     DecisionTree(ArrayList<Example> examples) {
-
-        System.out.println(examples.get(0));
-        Example e = examples.get(0);
-        decision = false;  // placeholder to compile
+        if (examples.isEmpty()) {
+        }
+        else {
+            HashSet<Feature> allFeatures = generateFeatures(examples);
+            Feature bestSplitFeature = bestSplit(examples, allFeatures);
+            ArrayList<ArrayList<Example>> splitExamples = splitExamples(examples, bestSplitFeature);
+            yesBranch = new DecisionTree(splitExamples.get(0));
+            noBranch = new DecisionTree(splitExamples.get(1));
+        }
     }
 
     public static class Results {
