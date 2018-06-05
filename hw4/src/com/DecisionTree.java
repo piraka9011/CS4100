@@ -42,8 +42,9 @@ public class DecisionTree {
             Feature.featureNames = header.split(",");
             System.err.println("Reading training examples...");
             ArrayList<Example> trainExamples = readExamples(scanner);
+            HashSet<Feature> allFeatures = generateFeatures(trainExamples);
             // We'll assume a delimiter of "---" separates train and test as before
-            DecisionTree tree = new DecisionTree(trainExamples);
+            DecisionTree tree = new DecisionTree(trainExamples, allFeatures);
             System.out.println(tree);
             System.out.println("Training data results: ");
             System.out.println(tree.classify(trainExamples));
@@ -207,6 +208,27 @@ public class DecisionTree {
 
     /**----- Implementation -----**/
 
+    public static HashSet<Feature> generateFeatures(ArrayList<Example> examples) {
+        HashSet<Feature> allFeatures  = new HashSet<Feature>();
+        for (Example example : examples) {
+            for (int i = 0; i < example.strings.length; i++) {
+                // Skip the target column
+                if (Feature.featureNames[i].equals("Target"))
+                    continue;
+                // Otherwise, add feature if its either numerical or string
+                if (Feature.isNumerical[i]){
+                    Feature newFeature = new Feature(i, example.numericals[i]);
+                    allFeatures.add(newFeature);
+                }
+                else {
+                    Feature newFeature = new Feature(i, example.strings[i]);
+                    allFeatures.add(newFeature);
+                }
+            }
+        }
+        return allFeatures;
+    }
+
     public double log2(double x) {
         if (x <= 0)
             return 0.0;
@@ -288,27 +310,6 @@ public class DecisionTree {
         return bestFeature;
     }
 
-    public HashSet<Feature> generateFeatures(ArrayList<Example> examples) {
-        HashSet<Feature> allFeatures  = new HashSet<Feature>();
-        for (Example example : examples) {
-            for (int i = 0; i < example.strings.length; i++) {
-                // Skip the target column
-                if (Feature.featureNames[i].equals("Target"))
-                    continue;
-                // Otherwise, add feature if its either numerical or string
-                if (Feature.isNumerical[i]){
-                    Feature newFeature = new Feature(i, example.numericals[i]);
-                    allFeatures.add(newFeature);
-                }
-                else {
-                    Feature newFeature = new Feature(i, example.strings[i]);
-                    allFeatures.add(newFeature);
-                }
-            }
-        }
-        return allFeatures;
-    }
-
     public boolean isPure(ArrayList<Example> examples) {
         // Get the first target element
         boolean result = examples.get(0).target;
@@ -322,17 +323,21 @@ public class DecisionTree {
     }
 
     // This constructor should create the whole decision tree recursively.
-    DecisionTree(ArrayList<Example> examples) {
-        if (examples.isEmpty()) {
-        }
-        else {
-            HashSet<Feature> allFeatures = generateFeatures(examples);
-            Feature bestSplitFeature = bestSplit(examples, allFeatures);
-            ArrayList<ArrayList<Example>> splitExamples = splitExamples(examples, bestSplitFeature);
-            yesBranch = new DecisionTree(splitExamples.get(0));
-            noBranch = new DecisionTree(splitExamples.get(1));
-        }
+    DecisionTree(ArrayList<Example> examples, HashSet<Feature> features) {
+        Feature bestSplitFeature = bestSplit(examples, features);
+        ArrayList<ArrayList<Example>> splitExamples = splitExamples(examples, bestSplitFeature);
+        features.remove(bestSplitFeature);
+        this.feature = bestSplitFeature;
+        yesBranch = new DecisionTree(splitExamples.get(0), );
+        noBranch = new DecisionTree(splitExamples.get(1));
+
     }
+
+//    public class RootNode extends DecisionTree {
+//        public RootNode(boolean decision) {
+//            this.decision = decision;
+//        }
+//    }
 
     public static class Results {
         public int true_positive;  // correctly classified "yes"
@@ -363,6 +368,9 @@ public class DecisionTree {
         Results results = new Results();
         // TODO your code here, classifying each example with the tree and comparing to
         // the truth to populate the results structure
+        for (Example example : examples) {
+
+        }
         return results;
     }
 
