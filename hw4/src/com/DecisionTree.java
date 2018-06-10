@@ -211,27 +211,7 @@ public class DecisionTree {
 
     /**----- Implementation -----**/
 
-    public static HashSet<Feature> generateFeatures(ArrayList<Example> examples) {
-        HashSet<Feature> allFeatures  = new HashSet<Feature>();
-        for (Example example : examples) {
-            for (int i = 0; i < example.strings.length; i++) {
-                // Skip the target column
-                if (Feature.featureNames[i].equals("Target"))
-                    continue;
-                // Otherwise, add feature if its either numerical or string
-                if (Feature.isNumerical[i]){
-                    Feature newFeature = new Feature(i, example.numericals[i]);
-                    allFeatures.add(newFeature);
-                }
-                else {
-                    Feature newFeature = new Feature(i, example.strings[i]);
-                    allFeatures.add(newFeature);
-                }
-            }
-        }
-        return allFeatures;
-    }
-
+    /** Calculates log base 2 of a number */
     public double log2(double x) {
         if (x <= 0)
             return 0.0;
@@ -239,6 +219,7 @@ public class DecisionTree {
             return Math.log(x) / Math.log(2);
     }
 
+    /** Returns the number of true targets in an example set */
     public double getTrueTargetCount(ArrayList<Example> examples) {
         double numTrue = 0;
         for (Example example : examples) {
@@ -248,6 +229,7 @@ public class DecisionTree {
         return numTrue;
     }
 
+    /** Returns the number of false targets in an example set */
     public double getFalseTargetCount(ArrayList<Example> examples) {
         double numFalse = 0;
         for (Example example : examples) {
@@ -257,6 +239,7 @@ public class DecisionTree {
         return numFalse;
     }
 
+    /** Gets the entropy of an example set */
     public double getEntropy(ArrayList<Example> examples) {
         if(examples.size() == 1)
             return 0.0;
@@ -269,6 +252,7 @@ public class DecisionTree {
         }
     }
 
+    /** Splits and example set based on a certain feature */
     public ArrayList<ArrayList<Example>> splitExamples(ArrayList<Example> examples, Feature feature) {
         // Setup
         ArrayList<Example> positiveExamples = new ArrayList<>();
@@ -287,6 +271,7 @@ public class DecisionTree {
         return splitExamples;
     }
 
+    /** Finds the example split that leads to the largest information gain */
     public Feature bestSplit(ArrayList<Example> examples, HashSet<Feature> features) {
         // Setup
         Feature bestFeature = null;
@@ -319,6 +304,7 @@ public class DecisionTree {
         return bestFeature;
     }
 
+    /** Checks if an example set is pure (All examples have the same target) */
     public boolean isPure(ArrayList<Example> examples) {
         // Get the first target element
         boolean result = examples.get(0).target;
@@ -331,24 +317,54 @@ public class DecisionTree {
         return true;
     }
 
+    /** Gets the target value that the majority of the examples have */
     public boolean getMajorityTarget(ArrayList<Example> examples) {
         int numTrue = 0, numFalse = 0;
+        // Iterate over all examples and count the number of T/F targets
         for (Example example : examples) {
             if (example.target)
                 numTrue++;
             else
                 numFalse++;
         }
-
-        if (numTrue >= numFalse)
-            return true;
-        else
-            return false;
+        return numTrue >= numFalse;
     }
 
+    /** Creates a set of all features in the current example list */
+    public static HashSet<Feature> generateFeatures(ArrayList<Example> examples) {
+        // Setup
+        HashSet<Feature> allFeatures  = new HashSet<>();
+        // Iterate over all examples
+        for (Example example : examples) {
+            // Iterate over all columns
+            for (int i = 0; i < example.strings.length; i++) {
+                // Skip the target column
+                if (Feature.featureNames[i].equals("Target"))
+                    continue;
+                // Otherwise, add feature if its either numerical or string
+                if (Feature.isNumerical[i]){
+                    Feature newFeature = new Feature(i, example.numericals[i]);
+                    allFeatures.add(newFeature);
+                }
+                else {
+                    Feature newFeature = new Feature(i, example.strings[i]);
+                    allFeatures.add(newFeature);
+                }
+            }
+        }
+        return allFeatures;
+    }
+
+    /** Conducts the Chi-Square test on an example set and its split */
     public double chiSquareTest(ArrayList<ArrayList<Example>> splitExamples, ArrayList<Example> examples) {
         ArrayList<Example> positiveExamples = splitExamples.get(0);
         ArrayList<Example> negativeExamples = splitExamples.get(1);
+        // Setup counts
+        double total = examples.size();
+        double originalTrue = getTrueTargetCount(examples);
+        double originalFalse = getFalseTargetCount(examples);
+        double totalPositive = positiveExamples.size();
+        double totalNegative = negativeExamples.size();
         // TP: True Target AND Positive Feature    TN: True Target AND Negative Feature
         // FP: False Target AND Positive Feature    FN: False Target AND Negative Feature
         /// Observed Counts
@@ -357,34 +373,16 @@ public class DecisionTree {
         double observedFP = getFalseTargetCount(positiveExamples);
         double observedFN = getFalseTargetCount(negativeExamples);
         /// Expected Counts
-        double total = examples.size();
-        double originalTrue = getTrueTargetCount(examples);
-        double originalFalse = getFalseTargetCount(examples);
-        double totalPositive = positiveExamples.size();
-        double totalNegative = negativeExamples.size();
-
         double expectedTP = (originalTrue * totalPositive) / total;
         double expectedTN = (originalTrue * totalNegative) / total;
         double expectedFP = (originalFalse * totalPositive) / total;
         double expectedFN = (originalFalse * totalPositive) / total;
-//        double totalTrue = observedTrueCountsNegative + observedTrueCountsPositive;
-//        double totalFalse = observedFalseCountsNegative + observedFalseCountsPositive;
-//        double totalPositive = observedFalseCountsPositive + observedTrueCountsPositive;
-//        double totalNegative = observedFalseCountsNegative + observedTrueCountsNegative;
-////        double totalCounts = examples.size();
-//        double totalCounts = totalFalse + totalTrue + totalNegative + totalPositive;
-//        // Split A
-//        double expectedTrueCountsPositive = (totalPositive * totalTrue) / totalCounts;
-//        double expectedTrueCountsNegative = (totalNegative * totalTrue) / totalCounts;
-//        // Split B
-//        double expectedFalseCountsPositive = (totalPositive * totalFalse) / totalCounts;
-//        double expectedFalseCountsNegative = (totalNegative * totalFalse) / totalCounts;
+        // Chi-Square formula
         double chi1 = Math.pow(observedTP - expectedTP, 2) / expectedTP;
         double chi2 = Math.pow(observedTN - expectedTN, 2) / expectedTN;
         double chi3 = Math.pow(observedFP - expectedFP, 2) / expectedFP;
         double chi4 = Math.pow(observedFN - expectedFN, 2) / expectedFN;
-        double chi = chi1 + chi2 + chi3 + chi4;
-        return chi;
+        return chi1 + chi2 + chi3 + chi4;
     }
 
     // This constructor should create the whole decision tree recursively.
@@ -408,7 +406,7 @@ public class DecisionTree {
                 // Split the examples based on the best feature
                 ArrayList<ArrayList<Example>> splitExamples = splitExamples(examples, bestSplitFeature);
                 this.feature = bestSplitFeature;
-                ///----- Pruning
+                ///----- Pruning -----///
                 if (PRUNE) {
                     double threshold = chiSquareTest(splitExamples, examples);
                     if (threshold < CHI_THRESH) {
@@ -422,7 +420,7 @@ public class DecisionTree {
                             noBranch = new DecisionTree(splitExamples.get(1));
                     }
                 }
-                ///----- Non-pruned tree
+                ///----- Non-pruned tree -----///
                 else {
                     NUM_QUESTIONS++;
                     // Recurse and split branches down as needed
@@ -434,7 +432,6 @@ public class DecisionTree {
             }
         }
     }
-
 
     public static class Results {
         public int true_positive;  // correctly classified "yes"
