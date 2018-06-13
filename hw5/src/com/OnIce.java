@@ -24,29 +24,44 @@ public class OnIce {
     // more reproducible across runs & students
     public static Random rng = new Random(2018);
 
+//    public static void main(String[] args) {
+//        try {
+////            File myFile = new File("bigQ.txt");
+//            File myFile = new File("4mdp.txt");
+////            File myFile = new File("3q.txt");
+//            Scanner myScanner = new Scanner(myFile);
+//            Problem problem = new Problem(myScanner);
+//            Policy policy = problem.solve(ITERATIONS);
+//            if (policy == null) {
+//                System.err.println("No policy.  Invalid solution approach?");
+//            } else {
+//                System.out.println(policy);
+//            }
+//            if (args.length > 0 && args[0].equals("eval")) {
+//                System.out.println("Average utility per move: "
+//                        + tryPolicy(policy, problem));
+//            }
+//
+//        }
+//            catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        }
+//
+//    }
+
     public static void main(String[] args) {
-        try {
-            File myFile = new File("bigQ.txt");
-//            File myFile = new File("0mdp.txt");
-//            File myFile = new File("3q.txt");
-            Scanner myScanner = new Scanner(myFile);
-            Problem problem = new Problem(myScanner);
-            Policy policy = problem.solve(ITERATIONS);
-            if (policy == null) {
-                System.err.println("No policy.  Invalid solution approach?");
-            } else {
-                System.out.println(policy);
-            }
-            if (args.length > 0 && args[0].equals("eval")) {
-                System.out.println("Average utility per move: "
-                        + tryPolicy(policy, problem));
-            }
-
+        Scanner myScanner = new Scanner(System.in);
+        Problem problem = new Problem(myScanner);
+        Policy policy = problem.solve(ITERATIONS);
+        if (policy == null) {
+            System.err.println("No policy.  Invalid solution approach?");
+        } else {
+            System.out.println(policy);
         }
-            catch (FileNotFoundException e) {
-            e.printStackTrace();
+        if (args.length > 0 && args[0].equals("eval")) {
+            System.out.println("Average utility per move: "
+                    + tryPolicy(policy, problem));
         }
-
     }
 
     public static class Problem {
@@ -188,6 +203,8 @@ public class OnIce {
         return totalUtility/(double)totalMoves;
     }
 
+    /// --- Start Row/Col Checks
+    // Adjust the Rows and Cols to make sure they are with bounds
     static int fixRow(int row) {
         if (row >= MAX_ROW)
             return MAX_ROW - 1;
@@ -212,12 +229,15 @@ public class OnIce {
         results[1] = col;
         return results;
     }
+    /// --- End Row/Col Checks
 
+    // Updates the policy based on the best action to take at a certain state
     static Policy updatePolicy(Policy policy, int bestAction, int row, int col) {
         policy.bestActions[row][col] = DIRECTIONS[bestAction];
         return policy;
     }
 
+    // Checks if we can index into an array. Used for determining if we have 1, 2, or 3 probabilities
     static boolean elementExists(double[] probs, int index) {
         try {
             double x = probs[index];
@@ -258,6 +278,7 @@ public class OnIce {
             }
         }
 
+        // Returns the utility of a certain move from a state and checks that state is in bounds
         double move(int direction, int row, int col) {
             // Adjust row and col if they are out of bounds
             int[] fixedRowCol = fixRowCol(row, col);
@@ -280,6 +301,7 @@ public class OnIce {
             return Double.NEGATIVE_INFINITY;
         }
 
+        // Gets the utility of moving 1, 2, or 3 steps depending on the probabilities
         double getDirectionUtility(Problem prob, int dir, int row, int col) {
             double result = 0;
             int[][] rowDims = { {-1, -2, -3 }, {1, 2, 3}, {0, 0, 0}, {0, 0, 0} };
@@ -302,6 +324,7 @@ public class OnIce {
             return result;
         }
 
+        // Gets the utility of all possible actions from a given state
         double[] getActionUtilities(Problem prob, int row, int col) {
             // Find utility of each action
             double[] actions = new double[4];
@@ -312,6 +335,7 @@ public class OnIce {
             return actions;
         }
 
+        // Gets the index of the best action to perform
         int getBestAction(double[] actions) {
             double maxAction = Double.NEGATIVE_INFINITY;
             int maxI = 0;
@@ -324,6 +348,7 @@ public class OnIce {
             return maxI;
         }
 
+        // Update the utility using value iteration
         void updateUtility(double action, int row, int col) {
             utilities[row][col] = rewards[row][col] + (DISCOUNT_FACTOR * action);
         }
@@ -362,7 +387,6 @@ public class OnIce {
             }
             return policy;
         }
-
     }
 
     // QLearner:  Same problem as MDP, but the agent doesn't know what the
@@ -402,6 +426,7 @@ public class OnIce {
             // Java: default init utilities to 0
         }
 
+        // Update the rows/cols and make sure they are within bounds
         int updateRow(int action, int row) {
             switch (action) {
                 case UP:
@@ -430,6 +455,7 @@ public class OnIce {
             return col;
         }
 
+        // Get the index of the best action based on the utility
         int bestAction(int row, int col) {
             double maxQ = Double.NEGATIVE_INFINITY;
             int maxA = 0;
@@ -443,14 +469,17 @@ public class OnIce {
             return maxA;
         }
 
+        // Returns Q(a, s)
         double Q(int action, int row, int col) {
             return utilities[action][row][col];
         }
 
+        // Returns R(s)
         double R(int row, int col) {
             return rewards[row][col];
         }
 
+        // Updates Q(a, s) according the next best action
         void updateQ(int action, int row, int col, int nextAction, int newRow, int newCol) {
             double QPrime = Q(nextAction, newRow, newCol);
             double Q = Q(action, row, col);
@@ -458,10 +487,12 @@ public class OnIce {
             utilities[action][row][col] = Q + (LEARNING_RATE * (R + DISCOUNT_FACTOR * QPrime - Q));
         }
 
+        // Check if our current state is a terminal state (pit/gold)
         boolean isTerminalState(int row, int col) {
             return rewards[row][col] == GOLD_REWARD || rewards[row][col] == PIT_REWARD;
         }
 
+        // Used to simply create the policy map for print out given utility map
         Policy findPolicy(Policy policy) {
             int action;
 
@@ -497,36 +528,33 @@ public class OnIce {
                 col = rng.nextInt(MAX_COL);
                 // Play the game until we win/lose
                 while (!isTerminalState(row, col)) {
-                    // Otherwise compute Q(s, a)
                     // Decide whether to move in a random direction...
                     if (rng.nextDouble() < EXPLORE_PROB)
                         action = rng.nextInt(ACTIONS);
-                    // Or the best Q-Value of its current square
+                    // Or the best Q-Value of its current state
                     else
                         action = bestAction(row, col);
 
                     // Find the new position
                     newRow = updateRow(action, row);
                     newCol = updateCol(action, col);
-
                     // Get the best action in the next state
                     nextAction = bestAction(newRow, newCol);
-
                     // Update utility
                     updateQ(action, row, col, nextAction, newRow, newCol);
                     // Update State
                     row = newRow;
                     col = newCol;
-                    }
+                }
 
-                // Set all actions to reward value
+                // Set all actions to reward value when we reach a terminal state
                 if (isTerminalState(row, col)) {
                     for (int a = 0; a < ACTIONS; a++) {
                         utilities[a][row][col] = rewards[row][col];
                     }
                 }
             }
-
+            // Create the map
             policy = findPolicy(policy);
             return policy;
         }
